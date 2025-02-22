@@ -1,19 +1,20 @@
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QPushButton, QLabel, QScrollArea
+from PyQt5.QtWidgets import QWidget, QVBoxLayout, QPushButton, QLabel, QScrollArea, QTableWidget, QTableWidgetItem
 from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QFont, QPixmap
+from PyQt5.QtGui import QFont, QPixmap, QColor
 
 class ResultsWindow(QWidget):
-    def __init__(self, score, total_questions, total_time, statistics):
+    def __init__(self, score, total_questions, total_time, statistics, question_history):
         super().__init__()
         self.score = score
         self.total_questions = total_questions
         self.total_time = total_time
         self.statistics = statistics
+        self.question_history = question_history
         self.initUI()
 
     def initUI(self):
         self.setWindowTitle('Game Results')
-        self.setGeometry(300, 300, 800, 600)
+        self.setGeometry(300, 300, 1000, 800)  # Made window wider and taller
         
         layout = QVBoxLayout()
         
@@ -45,15 +46,40 @@ class ResultsWindow(QWidget):
         for operation, accuracy in self.statistics['Performance by Operation'].items():
             self.add_statistic(scroll_layout, f'{operation}', f'{accuracy:.2%}')
         
-        # Add heatmap
-        heatmap_label = QLabel('Performance Heatmap:', self)
-        heatmap_label.setFont(QFont('Arial', 18, QFont.Bold))
-        scroll_layout.addWidget(heatmap_label)
+        # Add question history table with increased size
+        history_label = QLabel('Question History:', self)
+        history_label.setFont(QFont('Arial', 18, QFont.Bold))
+        scroll_layout.addWidget(history_label)
         
-        heatmap = QLabel(self)
-        pixmap = QPixmap('performance_heatmap.png')
-        heatmap.setPixmap(pixmap.scaled(700, 700, Qt.KeepAspectRatio, Qt.SmoothTransformation))
-        scroll_layout.addWidget(heatmap)
+        table = QTableWidget()
+        table.setColumnCount(4)
+        table.setHorizontalHeaderLabels(['Question', 'Your Answer', 'Correct Answer', 'Result'])
+        table.setRowCount(len(self.question_history))
+        
+        # Set minimum height for table
+        table.setMinimumHeight(400)  # Increased table height
+        
+        # Populate table
+        for i, record in enumerate(self.question_history):
+            question_item = QTableWidgetItem(record['question'])
+            user_answer_item = QTableWidgetItem(str(record['user_answer']))
+            correct_answer_item = QTableWidgetItem(str(record['correct_answer']))
+            result_item = QTableWidgetItem('Correct' if record['is_correct'] else 'Incorrect')
+            
+            if record['is_correct']:
+                result_item.setBackground(QColor(144, 238, 144))
+            else:
+                result_item.setBackground(QColor(255, 182, 193))
+            
+            table.setItem(i, 0, question_item)
+            table.setItem(i, 1, user_answer_item)
+            table.setItem(i, 2, correct_answer_item)
+            table.setItem(i, 3, result_item)
+        
+        table.resizeColumnsToContents()
+        scroll_layout.addWidget(table)
+        
+        # Remove heatmap section
         
         self.play_again_button = QPushButton('Play Again', self)
         self.play_again_button.setFont(QFont('Arial', 18))

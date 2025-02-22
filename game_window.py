@@ -1,4 +1,3 @@
-# game_window.py
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel, QLineEdit, QMessageBox
 from PyQt5.QtCore import QTimer, Qt
 from PyQt5.QtGui import QFont
@@ -20,6 +19,8 @@ class GameWindow(QWidget):
         self.new_question()
         self.timer.start(1000)
         self.data_manager = DataManager()
+        self.skipping_enabled = False
+        self.question_history = []  # List to store question history
 
     def initUI(self):
         self.setWindowTitle('Arithmetic Game')
@@ -35,7 +36,8 @@ class GameWindow(QWidget):
         self.answer_input = QLineEdit(self)
         self.answer_input.setAlignment(Qt.AlignCenter)
         self.answer_input.setFont(QFont('Arial', 18))
-        self.answer_input.returnPressed.connect(self.check_answer)
+        self.answer_input.textChanged.connect(self.check_answer_on_type)
+        self.answer_input.returnPressed.connect(self.handle_enter)
         layout.addWidget(self.answer_input)
         
         self.score_label = QLabel('Score: 0', self)
@@ -48,7 +50,79 @@ class GameWindow(QWidget):
         self.time_label.setFont(QFont('Arial', 18))
         layout.addWidget(self.time_label)
         
+        self.hint_label = QLabel('Press Enter to skip if stuck', self)
+        self.hint_label.setAlignment(Qt.AlignCenter)
+        self.hint_label.setFont(QFont('Arial', 12))
+        self.hint_label.hide()
+        layout.addWidget(self.hint_label)
+        
         self.setLayout(layout)
+
+    def check_answer_on_type(self):
+        if not self.skipping_enabled:
+            user_answer = self.answer_input.text().strip()
+            try:
+                if user_answer:
+                    user_value = float(user_answer)
+                    # Round both values to handle floating point precision
+                    user_value = round(user_value, 6)
+                    correct_answer = round(self.answer, 6)
+                    
+                    if user_value == correct_answer:
+                        # Record the question and result
+                        self.question_history.append({
+                            'question': self.question,
+                            'user_answer': user_value,
+                            'correct_answer': correct_answer,
+                            'is_correct': True
+                        })
+                        
+                        # Add result to data manager
+                        self.data_manager.add_result(
+                            self.current_operation, 
+                            self.current_term1, 
+                            self.current_term2, 
+                            True
+                        )
+                        self.score += 1
+                        self.questions_asked += 1
+                        self.score_label.setText(f'Score: {self.score}')
+                        self.hint_label.hide()
+                        self.skipping_enabled = False
+                        QTimer.singleShot(100, self.new_question)
+            except ValueError:
+                pass
+
+    def handle_enter(self):
+        if self.skipping_enabled:
+            # Record the skipped question
+            self.question_history.append({
+                'question': self.question,
+                'user_answer': self.answer_input.text().strip(),
+                'correct_answer': round(self.answer, 6),
+                'is_correct': False
+            })
+            
+            self.data_manager.add_result(
+                self.current_operation, 
+                self.current_term1, 
+                self.current_term2, 
+                False
+            )
+            self.questions_asked += 1
+            self.hint_label.hide()
+            self.skipping_enabled = False
+            self.new_question()
+        else:
+            # If the answer is wrong, enable skipping
+            user_answer = self.answer_input.text().strip()
+            try:
+                user_value = float(user_answer)
+                if round(user_value, 6) != round(self.answer, 6):
+                    self.hint_label.show()
+                    self.skipping_enabled = True
+            except ValueError:
+                pass
 
     def new_question(self):
         operations = list(self.ranges.keys())
@@ -61,7 +135,7 @@ class GameWindow(QWidget):
             a = random.randint(term1_range['min'], term1_range['max'])
             b = random.randint(term2_range['min'], term2_range['max'])
             if operation == '-' and b > a:
-                a, b = b, a  # Ensure a >= b for subtraction
+                a, b = b, a
         elif operation == '×':
             a = random.randint(term1_range['min'], term1_range['max'])
             b = random.randint(term2_range['min'], term2_range['max'])
@@ -84,23 +158,7 @@ class GameWindow(QWidget):
         self.current_term1 = a
         self.current_term2 = b
 
-    def check_answer(self):
-        user_answer = self.answer_input.text()
-        try:
-            correct = abs(float(user_answer) - self.answer) < 1e-6
-            if correct:
-                self.score += 1
-            self.questions_asked += 1
-            self.score_label.setText(f'Score: {self.score}')
-            
-            # Add result to data manager
-            self.data_manager.add_result(self.current_operation, self.current_term1, self.current_term2, correct)
-            
-            self.new_question()
-        except ValueError:
-            QMessageBox.warning(self, "Invalid Input", "Please enter a valid number.")
-
-    def update_timer(self): 
+    def update_timer(self):
         self.time_left -= 1
         self.time_label.setText(f'Time: {self.time_left}')
         if self.time_left <= 0:
@@ -109,8 +167,14 @@ class GameWindow(QWidget):
 
     def end_game(self):
         self.data_manager.save_results()
-        self.data_manager.create_heatmap()
+        # self.data_manager.create_heatmap()
         statistics = self.data_manager.get_statistics()
-        self.results_window = ResultsWindow(self.score, self.questions_asked, self.start_time, statistics)
+        self.results_window = ResultsWindow(
+            self.score, 
+            self.questions_asked, 
+            self.start_time, 
+            statistics,
+            self.question_history  # Pass question history to results window
+        )
         self.results_window.show()
         self.close()
