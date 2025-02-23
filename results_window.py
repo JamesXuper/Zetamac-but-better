@@ -1,4 +1,5 @@
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QPushButton, QLabel, QScrollArea, QTableWidget, QTableWidgetItem
+from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QPushButton, QLabel, 
+                           QScrollArea, QTableWidget, QTableWidgetItem, QTabWidget)
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont, QPixmap, QColor
 
@@ -14,52 +15,74 @@ class ResultsWindow(QWidget):
 
     def initUI(self):
         self.setWindowTitle('Game Results')
-        self.setGeometry(300, 300, 1000, 800)  # Made window wider and taller
+        self.setGeometry(300, 300, 1200, 800)
         
         layout = QVBoxLayout()
         
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll_content = QWidget()
-        scroll_layout = QVBoxLayout(scroll_content)
+        # Create tab widget
+        tab_widget = QTabWidget()
         
-        title_label = QLabel('Game Results', self)
+        # Current Game Tab
+        current_game_tab = QWidget()
+        current_game_layout = QVBoxLayout()
+        
+        title_label = QLabel('Current Game Results', self)
         title_label.setAlignment(Qt.AlignCenter)
         title_label.setFont(QFont('Arial', 24, QFont.Bold))
-        scroll_layout.addWidget(title_label)
+        current_game_layout.addWidget(title_label)
         
         # Add game statistics
-        self.add_statistic(scroll_layout, 'Score', f'{self.score}/{self.total_questions}')
-        self.add_statistic(scroll_layout, 'Accuracy', f'{(self.score / self.total_questions) * 100:.2f}%' if self.total_questions > 0 else 'N/A')
-        self.add_statistic(scroll_layout, 'Average Time per Question', f'{self.total_time / self.total_questions:.2f} seconds' if self.total_questions > 0 else 'N/A')
+        self.add_statistic(current_game_layout, 'Game Session', self.statistics['Game Session'])
+        self.add_statistic(current_game_layout, 'Score', f'{self.score}/{self.total_questions}')
+        self.add_statistic(current_game_layout, 'Accuracy', 
+                          f'{(self.score / self.total_questions) * 100:.2f}%' if self.total_questions > 0 else 'N/A')
+        self.add_statistic(current_game_layout, 'Average Time per Question', 
+                          f'{self.total_time / self.total_questions:.2f} seconds' if self.total_questions > 0 else 'N/A')
         
-        # Add overall statistics
-        self.add_statistic(scroll_layout, 'Total Questions (All Games)', self.statistics['Total Questions'])
-        self.add_statistic(scroll_layout, 'Total Correct Answers (All Games)', self.statistics['Correct Answers'])
-        self.add_statistic(scroll_layout, 'Overall Accuracy', self.statistics['Accuracy'])
-        
-        # Add performance by operation
-        performance_label = QLabel('Performance by Operation:', self)
-        performance_label.setFont(QFont('Arial', 18, QFont.Bold))
-        scroll_layout.addWidget(performance_label)
-        
-        for operation, accuracy in self.statistics['Performance by Operation'].items():
-            self.add_statistic(scroll_layout, f'{operation}', f'{accuracy:.2%}')
-        
-        # Add question history table with increased size
+        # Add question history table
         history_label = QLabel('Question History:', self)
         history_label.setFont(QFont('Arial', 18, QFont.Bold))
-        scroll_layout.addWidget(history_label)
+        current_game_layout.addWidget(history_label)
         
+        current_game_layout.addWidget(self.create_question_history_table())
+        
+        current_game_tab.setLayout(current_game_layout)
+        
+        # All Games History Tab
+        all_games_tab = QWidget()
+        all_games_layout = QVBoxLayout()
+        
+        all_games_title = QLabel('All Games History', self)
+        all_games_title.setAlignment(Qt.AlignCenter)
+        all_games_title.setFont(QFont('Arial', 24, QFont.Bold))
+        all_games_layout.addWidget(all_games_title)
+        
+        # Add table with all games history
+        all_games_layout.addWidget(self.create_all_games_table())
+        
+        all_games_tab.setLayout(all_games_layout)
+        
+        # Add tabs to tab widget
+        tab_widget.addTab(current_game_tab, "Current Game")
+        tab_widget.addTab(all_games_tab, "All Games History")
+        
+        layout.addWidget(tab_widget)
+        
+        # Play Again button
+        self.play_again_button = QPushButton('Play Again', self)
+        self.play_again_button.setFont(QFont('Arial', 18))
+        self.play_again_button.clicked.connect(self.play_again)
+        layout.addWidget(self.play_again_button)
+        
+        self.setLayout(layout)
+
+    def create_question_history_table(self):
         table = QTableWidget()
         table.setColumnCount(4)
         table.setHorizontalHeaderLabels(['Question', 'Your Answer', 'Correct Answer', 'Result'])
         table.setRowCount(len(self.question_history))
+        table.setMinimumHeight(300)
         
-        # Set minimum height for table
-        table.setMinimumHeight(400)  # Increased table height
-        
-        # Populate table
         for i, record in enumerate(self.question_history):
             question_item = QTableWidgetItem(record['question'])
             user_answer_item = QTableWidgetItem(str(record['user_answer']))
@@ -67,9 +90,9 @@ class ResultsWindow(QWidget):
             result_item = QTableWidgetItem('Correct' if record['is_correct'] else 'Incorrect')
             
             if record['is_correct']:
-                result_item.setBackground(QColor(144, 238, 144))
+                result_item.setBackground(QColor(144, 238, 144))  # Light green
             else:
-                result_item.setBackground(QColor(255, 182, 193))
+                result_item.setBackground(QColor(255, 182, 193))  # Light red
             
             table.setItem(i, 0, question_item)
             table.setItem(i, 1, user_answer_item)
@@ -77,19 +100,46 @@ class ResultsWindow(QWidget):
             table.setItem(i, 3, result_item)
         
         table.resizeColumnsToContents()
-        scroll_layout.addWidget(table)
+        return table
+
+    def create_all_games_table(self):
+        from data_manager import DataManager
+        all_stats = DataManager().get_all_game_statistics()
         
-        # Remove heatmap section
+        table = QTableWidget()
+        table.setColumnCount(6)
+        table.setHorizontalHeaderLabels([
+            'Game Session', 
+            'Total Questions', 
+            'Correct Answers', 
+            'Accuracy',
+            'Avg Time/Question',
+            'Performance by Operation'
+        ])
+        table.setRowCount(len(all_stats))
         
-        self.play_again_button = QPushButton('Play Again', self)
-        self.play_again_button.setFont(QFont('Arial', 18))
-        self.play_again_button.clicked.connect(self.play_again)
-        scroll_layout.addWidget(self.play_again_button)
+        for i, game in enumerate(all_stats):
+            session_item = QTableWidgetItem(game['Game Session'])
+            total_q_item = QTableWidgetItem(str(game['Total Questions']))
+            correct_item = QTableWidgetItem(str(game['Correct Answers']))
+            accuracy_item = QTableWidgetItem(game['Accuracy'])
+            time_item = QTableWidgetItem(game['Average Time per Question'])
+            
+            # Format performance by operation as a string
+            performance_str = ', '.join(
+                [f"{op}: {acc:.2%}" for op, acc in game['Performance by Operation'].items()]
+            )
+            performance_item = QTableWidgetItem(performance_str)
+            
+            table.setItem(i, 0, session_item)
+            table.setItem(i, 1, total_q_item)
+            table.setItem(i, 2, correct_item)
+            table.setItem(i, 3, accuracy_item)
+            table.setItem(i, 4, time_item)
+            table.setItem(i, 5, performance_item)
         
-        scroll.setWidget(scroll_content)
-        layout.addWidget(scroll)
-        
-        self.setLayout(layout)
+        table.resizeColumnsToContents()
+        return table
 
     def add_statistic(self, layout, label, value):
         stat_label = QLabel(f'{label}: {value}', self)

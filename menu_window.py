@@ -8,10 +8,10 @@ class MenuWindow(QWidget):
     def __init__(self):
         super().__init__()
         self.default_ranges = {
-            '+': {'term1': {'min': 1, 'max': 100}, 'term2': {'min': 0, 'max': 100}},
-            '-': {'term1': {'min': 1, 'max': 100}, 'term2': {'min': 0, 'max': 100}},
-            '×': {'term1': {'min': 1, 'max': 12}, 'term2': {'min': 1, 'max': 100}},
-            '÷': {'term1': {'min': 1, 'max': 12}, 'term2': {'min': 1, 'max': 100}}
+            '+': {'term1': {'min': 1, 'max': 100}, 'term2': {'min': 1, 'max': 100}},
+            '-': {'term1': {'min': 1, 'max': 100}, 'term2': {'min': 1, 'max': 100}},
+            '×': {'term1': {'min': 1, 'max': 100}, 'term2': {'min': 1, 'max': 12}},
+            '÷': {'term1': {'min': 1, 'max': 100}, 'term2': {'min': 1, 'max': 12}}
         }
         self.initUI()
 
