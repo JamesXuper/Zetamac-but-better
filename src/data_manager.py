@@ -7,7 +7,7 @@ import numpy as np
 
 class DataManager:
     def __init__(self):
-        self.file_path = 'arithmetic_game_results.xlsx'
+        self.file_path = '../tests/arithmetic_game_results.xlsx'
         self.current_sheet_name = self.generate_sheet_name()
         self.df = self.load_or_create_dataframe()
         self.last_question_time = datetime.now()
